@@ -10,16 +10,26 @@ const redisCache=new Redis();
 
 const io=new Server(httpServer,{
     cors:{
-        origin:'*',
-        methods:["GET","POST"]
+        origin:'*',//all address
+        methods:["GET","POST"]//ony get and post allow>>
     }
 });
+/**
+ * cors  is a browser issue browser only know about client address but inside client we are making request 
+ * to another backend service which browser do not know thus browser raise cors error
+ * to resolve this we set cors config in backend server
+ * to check wheteher cors issue will raise  or not browser send preflight request
+ * and when browser recieve response from server with properly set header then browser allow cliewnt
+ * to make cross origin request hence it resolve cors error>> 
+ */
 
 io.on('connection',(socket)=>{
     console.log('user connected',socket.id);
 
-    socket.on('setUserId',(userId)=>{
-        redisCache.set(userId,socket.id);
+    socket.on('setUserId',async (userId)=>{
+        console.log('setting socketid to user id')
+        await redisCache.set(userId.trim(), socket.id);
+
     });
 
     socket.on('getConnectionId',async (userId)=>{
@@ -29,20 +39,23 @@ io.on('connection',(socket)=>{
     })
 });
 app.post('/sendPayload', async (req,res)=>{
-    const {userId,payload}=req.body;
-    if(!userId || !payload){
-        res.status(400).send('invalid request');
+    console.log(req.body);
+    const {userId,response}=req.body;
+    if(!userId || !response){
+       return res.status(400).send('invalid request');
     }
+    console.log(userId,response)
     const socketId=await redisCache.get(userId);
+    console.log(socketId);
     if(socketId){
-        io.to(socketId).emit('submissionPayload',payload);
-        res.status(200).send('payload sent successfully');
+        io.to(socketId).emit('submissionPayload',response);
+        return res.status(200).send('payload sent successfully');
     }
     else{
-        res.status(400).send('user not connected');
+        return res.status(400).send('user not connected');
     }
 })
 
-httpServer.listen(3000,()=>{
-    console.log('server is up at port 3000');
+httpServer.listen(3001,()=>{
+    console.log('server is up at port 3001');
 });
